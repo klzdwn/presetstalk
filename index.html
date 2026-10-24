@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AM Preset Extractor - Saweria Style</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#FFC107',
+              hover: '#E0A800',
+              light: '#FFF9E6',
+              dark: '#2D2D2D',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col items-center justify-center p-4 sm:p-6">
+
+  <div class="w-full max-w-md space-y-4">
+
+    <!-- Card Profil Header Saweria Style -->
+    <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 text-center relative overflow-hidden">
+      <div class="absolute top-0 left-0 right-0 h-3 bg-brand"></div>
+      
+      <div class="w-16 h-16 bg-brand-light border-4 border-white shadow-md rounded-full mx-auto flex items-center justify-center text-brand font-black text-2xl mt-2 mb-3">
+        ⚡
+      </div>
+      
+      <h1 class="text-xl font-extrabold text-gray-900">Preset AM Extractor</h1>
+      <p class="text-xs text-gray-500 mt-1">Tempel link TikTok untuk mengambil Preset 5MB & XML secara otomatis</p>
+    </div>
+
+    <!-- Form Input Link -->
+    <div class="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 space-y-3">
+      <label class="text-xs font-bold text-gray-600 uppercase tracking-wider block px-1">Link Video TikTok</label>
+      <div class="space-y-2">
+        <input type="url" id="tiktokUrl" placeholder="https://vt.tiktok.com/xxxx/" 
+               class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-brand focus:bg-white transition-all">
+        
+        <button onclick="extractPreset()" id="btnExtract" 
+                class="w-full bg-brand hover:bg-brand-hover text-gray-900 font-bold py-3 px-4 rounded-2xl text-sm transition-all shadow-sm flex items-center justify-center gap-2">
+          <i class="ph-bold ph-magnifying-glass text-lg"></i> Cari Link Preset
+        </button>
+      </div>
+    </div>
+
+    <!-- Indikator Loading -->
+    <div id="loading" class="hidden bg-white rounded-3xl p-6 text-center border border-gray-100 shadow-sm space-y-2">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-brand border-t-transparent"></div>
+      <p class="text-xs font-semibold text-gray-500">Mengekstrak data & mencari link preset...</p>
+    </div>
+
+    <!-- Card Hasil Output -->
+    <div id="resultCard" class="hidden bg-white rounded-3xl p-5 shadow-sm border border-gray-100 space-y-4">
+      <div class="flex items-center gap-3 border-b border-gray-100 pb-3">
+        <img id="authorAvatar" src="" class="w-10 h-10 rounded-full border border-gray-200 object-cover">
+        <div class="overflow-hidden">
+          <h3 id="authorName" class="font-bold text-xs text-gray-800 truncate"></h3>
+          <p id="videoTitle" class="text-[11px] text-gray-500 line-clamp-2 mt-0.5"></p>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <h4 class="text-xs font-bold text-gray-700">Link Preset Ditemukan:</h4>
+
+        <!-- Preset 5MB -->
+        <div id="box5mb" class="flex items-center justify-between p-3 bg-amber-50 rounded-2xl border border-amber-200">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-amber-400 text-gray-900 flex items-center justify-center font-black text-xs">
+              5M
+            </div>
+            <div>
+              <p class="text-xs font-bold text-gray-800">Preset 5MB (Alight Link)</p>
+              <p class="text-[10px] text-gray-500">Langsung ke Alight Motion</p>
+            </div>
+          </div>
+          <a id="link5mb" href="#" target="_blank" class="bg-brand hover:bg-brand-hover text-gray-900 font-bold px-3 py-1.5 rounded-xl text-xs transition-all flex items-center gap-1">
+            Buka <i class="ph-bold ph-arrow-up-right"></i>
+          </a>
+        </div>
+
+        <!-- Preset XML -->
+        <div id="boxXml" class="flex items-center justify-between p-3 bg-blue-50 rounded-2xl border border-blue-200">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center font-black text-xs">
+              XML
+            </div>
+            <div>
+              <p class="text-xs font-bold text-gray-800">Preset XML (Drive / File)</p>
+              <p class="text-[10px] text-gray-500">File dokumen XML</p>
+            </div>
+          </div>
+          <a id="linkXml" href="#" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all flex items-center gap-1">
+            Download <i class="ph-bold ph-arrow-up-right"></i>
+          </a>
+        </div>
+
+        <div id="noLinksFound" class="hidden p-3 bg-gray-50 rounded-2xl border border-gray-200 text-center text-xs text-gray-500">
+          Tidak ditemukan link preset di deskripsi video TikTok ini.
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center pt-2 text-xs text-gray-400">
+      <p>Powered by <span class="font-bold text-gray-600">AM Link Extractor</span></p>
+    </div>
+
+  </div>
+
+  <script>
+    async function extractPreset() {
+      const tiktokUrl = document.getElementById('tiktokUrl').value.trim();
+      const loading = document.getElementById('loading');
+      const resultCard = document.getElementById('resultCard');
+      const btnExtract = document.getElementById('btnExtract');
+
+      if (!tiktokUrl) {
+        alert('Masukkan link TikTok terlebih dahulu!');
+        return;
+      }
+
+      loading.classList.remove('hidden');
+      resultCard.classList.add('hidden');
+      btnExtract.disabled = true;
+
+      try {
+        const response = await fetch('/api/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tiktokUrl })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          alert(data.message || 'Gagal mengambil data dari TikTok.');
+          return;
+        }
+
+        document.getElementById('authorName').innerText = '@' + data.author;
+        document.getElementById('videoTitle').innerText = data.title;
+        document.getElementById('authorAvatar').src = data.avatar || 'https://via.placeholder.com/150';
+
+        const box5mb = document.getElementById('box5mb');
+        if (data.preset5mb) {
+          document.getElementById('link5mb').href = data.preset5mb;
+          box5mb.classList.remove('hidden');
+        } else {
+          box5mb.classList.add('hidden');
+        }
+
+        const boxXml = document.getElementById('boxXml');
+        if (data.presetXml) {
+          document.getElementById('linkXml').href = data.presetXml;
+          boxXml.classList.remove('hidden');
+        } else {
+          boxXml.classList.add('hidden');
+        }
+
+        const noLinksFound = document.getElementById('noLinksFound');
+        if (!data.preset5mb && !data.presetXml) {
+          noLinksFound.classList.remove('hidden');
+        } else {
+          noLinksFound.classList.add('hidden');
+        }
+
+        resultCard.classList.remove('hidden');
+
+      } catch (err) {
+        alert('Terjadi kesalahan sistem/jaringan.');
+      } finally {
+        loading.classList.add('hidden');
+        btnExtract.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
