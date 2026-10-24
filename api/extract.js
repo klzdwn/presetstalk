@@ -5,13 +5,8 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method Not Allowed' });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Method Not Allowed' });
 
   const { tiktokUrl } = req.body || {};
 
@@ -20,67 +15,88 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // 1. Ambil data utama video (caption & author)
-    const response = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(tiktokUrl)}&comment=1`);
-    const data = response.data;
+    // 1. Ambil data utama & komentar dari TikWM dengan parameter komplit
+    const response = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(tiktokUrl)}&comment=1`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
 
-    if (data.code !== 0 || !data.data) {
+    const resData = response.data;
+
+    if (resData.code !== 0 || !resData.data) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Gagal mengambil data video. Pastikan link valid.' 
+        message: 'Gagal mengambil data video TikTok.' 
       });
     }
 
-    let allText = data.data.title || ''; // Ambil dari caption
+    const videoData = resData.data;
+    let textCorpus = [];
 
-    // 2. Jika ada data komen, gabungkan teks komen ke dalam carian link
-    if (data.data.comments && Array.isArray(data.data.comments)) {
-      data.data.comments.forEach(comment => {
-        if (comment.text) {
-          allText += ' ' + comment.text;
-        }
+    // Kumpulkan Caption
+    if (videoData.title) textCorpus.push(videoData.title);
+
+    // Kumpulkan Komentar (Termasuk Pinned Comment)
+    if (videoData.comments && Array.isArray(videoData.comments)) {
+      videoData.comments.forEach(c => {
+        if (c.text) textCorpus.push(c.text);
       });
     }
 
-    // 3. Regex untuk mencari semua URL dalam caption & komen
-    const urlRegex = /(https?:\/\/[^\s]+)/gi;
-    const foundUrls = allText.match(urlRegex) || [];
+    // Gabungkan seluruh teks yang ditemukan
+    const fullText = textCorpus.join(' ');
+
+    // 2. Extractor Regex untuk mendeteksi semua bentuk URL (Termasuk shortener)
+    const urlRegex = /(https?:\/\/[^\s<>"{}|\^~\[\]`]+)/gi;
+    let matches = fullText.match(urlRegex) || [];
+
+    // Bersihkan tanda baca di akhir URL
+    matches = matches.map(u => u.replace(/[.,;)]$/, ''));
 
     let preset5mb = null;
     let presetXml = null;
 
-    foundUrls.forEach(url => {
+    // Filter link berdasarkan karakteristiknya
+    for (const url of matches) {
       const lower = url.toLowerCase();
-      if (lower.includes('alight.link') || lower.includes('alightmotion.com')) {
-        preset5mb = url;
-      } else if (
-        lower.includes('drive.google.com') || 
-        lower.includes('mediafire.com') || 
-        lower.includes('xml') || 
-        lower.includes('dropbox.com')
+      
+      // Deteksi Preset 5MB / Alight Link
+      if (lower.includes('alight.link') || lower.includes('alightmotion') || lower.includes('am.link')) {
+        if (!preset5mb) preset5mb = url;
+      } 
+      // Deteksi XML / Drive / Storage / Shortener
+      else if (
+        lower.includes('drive.google') || 
+        lower.includes('mediafire') || 
+        lower.includes('dropbox') || 
+        lower.includes('s.id') || 
+        lower.includes('bit.ly') ||
+        lower.includes('xml')
       ) {
-        presetXml = url;
+        if (!presetXml) presetXml = url;
       }
-    });
+    }
 
-    if (!preset5mb && foundUrls.length > 0) preset5mb = foundUrls[0];
-    if (!presetXml && foundUrls.length > 1) presetXml = foundUrls[1];
+    // Fallback jika ada link yang ditemukan tapi belum terkategori
+    if (!preset5mb && matches.length > 0) preset5mb = matches[0];
+    if (!presetXml && matches.length > 1) presetXml = matches[1];
 
     return res.status(200).json({
       success: true,
-      title: data.data.title,
-      author: data.data.author.nickname || data.data.author.unique_id,
-      avatar: data.data.author.avatar,
+      title: videoData.title,
+      author: videoData.author.nickname || videoData.author.unique_id,
+      avatar: videoData.author.avatar,
       preset5mb: preset5mb,
       presetXml: presetXml,
-      rawUrls: foundUrls
+      rawUrls: matches
     });
 
   } catch (error) {
-    console.error('Error Extracting:', error.message);
+    console.error('Extractor Error:', error.message);
     return res.status(500).json({ 
       success: false, 
-      message: 'Terjadi kesalahan pada server.' 
+      message: 'Terjadi kesalahan sistem saat mengekstrak link.' 
     });
   }
 };
