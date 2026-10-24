@@ -1,7 +1,6 @@
 const axios = require('axios');
 
 module.exports = async (req, res) => {
-  // Set CORS Header
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -21,27 +20,35 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Request ke API TikWM untuk parsing caption video TikTok
-    const response = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(tiktokUrl)}`);
+    // 1. Ambil data utama video (caption & author)
+    const response = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(tiktokUrl)}&comment=1`);
     const data = response.data;
 
     if (data.code !== 0 || !data.data) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Gagal mengambil data video. Pastikan link video TikTok valid dan publik.' 
+        message: 'Gagal mengambil data video. Pastikan link valid.' 
       });
     }
 
-    const caption = data.data.title || '';
-    
-    // Regex untuk mendeteksi URL di caption
+    let allText = data.data.title || ''; // Ambil dari caption
+
+    // 2. Jika ada data komen, gabungkan teks komen ke dalam carian link
+    if (data.data.comments && Array.isArray(data.data.comments)) {
+      data.data.comments.forEach(comment => {
+        if (comment.text) {
+          allText += ' ' + comment.text;
+        }
+      });
+    }
+
+    // 3. Regex untuk mencari semua URL dalam caption & komen
     const urlRegex = /(https?:\/\/[^\s]+)/gi;
-    const foundUrls = caption.match(urlRegex) || [];
+    const foundUrls = allText.match(urlRegex) || [];
 
     let preset5mb = null;
     let presetXml = null;
 
-    // Filter link berdasarkan domain & tipe link
     foundUrls.forEach(url => {
       const lower = url.toLowerCase();
       if (lower.includes('alight.link') || lower.includes('alightmotion.com')) {
@@ -56,16 +63,14 @@ module.exports = async (req, res) => {
       }
     });
 
-    // Fallback jika tidak teridentifikasi spesifik
     if (!preset5mb && foundUrls.length > 0) preset5mb = foundUrls[0];
     if (!presetXml && foundUrls.length > 1) presetXml = foundUrls[1];
 
     return res.status(200).json({
       success: true,
-      title: caption,
+      title: data.data.title,
       author: data.data.author.nickname || data.data.author.unique_id,
       avatar: data.data.author.avatar,
-      cover: data.data.cover,
       preset5mb: preset5mb,
       presetXml: presetXml,
       rawUrls: foundUrls
@@ -75,7 +80,7 @@ module.exports = async (req, res) => {
     console.error('Error Extracting:', error.message);
     return res.status(500).json({ 
       success: false, 
-      message: 'Terjadi kesalahan pada server saat mengekstrak link.' 
+      message: 'Terjadi kesalahan pada server.' 
     });
   }
 };
